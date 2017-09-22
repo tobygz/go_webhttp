@@ -8,8 +8,6 @@ import (
         "strings"
 )
 
-var ct int = 0
-
 type DataReq struct {
         reqStr string
         conn   net.Conn
@@ -20,22 +18,6 @@ type web struct {
 }
 
 var GlobalWeb *web
-
-func main() {
-        webobj := NewWeb()
-        webobj.Start(":8080")
-
-        WaitSignal()
-}
-
-func WaitSignal() {
-        // close
-        c := make(chan os.Signal, 1)
-        //signal.Notify(c, os.Interrupt, os.Kill)
-        signal.Notify(c, os.Interrupt, os.Kill)
-        sig := <-c
-        fmt.Println(sig)
-}
 
 func NewWeb() *web {
         if GlobalWeb != nil {
@@ -134,6 +116,16 @@ func (this *web) handleRequest(conn net.Conn, reqBody string) {
         conn.Close()
 }
 
+func (this *web) WaitSignal() {
+        // close
+        c := make(chan os.Signal, 1)
+        //signal.Notify(c, os.Interrupt, os.Kill)
+        signal.Notify(c, os.Interrupt, os.Kill)
+        sig := <-c
+        fmt.Println(sig)
+        close(this.reqChan)
+}
+
 func parseReqAry(reqStr string) []string {
         retAry := strings.Split(reqStr, "\r\n")
         nowLen := len(retAry)
@@ -158,4 +150,11 @@ func checkFullReq(reqStr string) (bool, []string) {
 func parseReq(reqAry []string) string {
         retAry := strings.Split(reqAry[0], " ")
         return retAry[1]
+}
+
+func main() {
+        webobj := NewWeb()
+        webobj.Start(":8080")
+
+        webobj.WaitSignal()
 }
