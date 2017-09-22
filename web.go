@@ -5,6 +5,7 @@ import (
         "net"
         "os"
         "os/signal"
+        "reflect"
         "strings"
 )
 
@@ -13,8 +14,14 @@ type DataReq struct {
         conn   net.Conn
 }
 
+type HandleReq struct {
+        name   string
+        reqStr string
+}
+
 type web struct {
         reqChan chan *DataReq
+        apis    map[string]reflect.Value
 }
 
 var GlobalWeb *web
@@ -25,6 +32,7 @@ func NewWeb() *web {
         }
         GlobalWeb := &web{
                 reqChan: make(chan *DataReq, 16),
+                apis:    make(map[string]reflect.Value, 32),
         }
 
         return GlobalWeb
@@ -79,6 +87,17 @@ func (this *web) Start(port string) {
         }
 }
 
+func (this *web) AddHandles(router interface{}) {
+        value := reflect.ValueOf(router)
+        tp := value.Type()
+        for i := 0; i < value.NumMethod(); i++ {
+                name := tp.Method(i).Name
+                name = fmt.Sprintf("/%s", strings.ToLower(name))
+                fmt.Println("AddHandles add ", name)
+                this.apis[name] = value.Method(i)
+        }
+}
+
 func parseReqBody(reqBody string) *map[string]string {
         ret := make(map[string]string, 0)
         ary0 := strings.Split(reqBody, "?")
@@ -109,7 +128,16 @@ func (this *web) handleRequest(conn net.Conn, reqBody string) {
 
         parseMap := parseReqBody(reqBody)
         reqName, _ := (*parseMap)["innerreqname"]
-        valSend := fmt.Sprintf("hello web golang reqName: %s, map length: %d", reqName, len(*parseMap))
+        //valSend := fmt.Sprintf("hello web golang reqName: %s, map length: %d", reqName, len(*parseMap))
+
+        var valSend string
+        f, ok := this.apis[reqName]
+        if !ok {
+                valSend = fmt.Sprintf("req:%s not found", reqName)
+        } else {
+                tmpret := f.Call([]reflect.Value{reflect.ValueOf(parseMap)})
+                valSend = tmpret[0].String()
+        }
 
         sendByte := fmt.Sprintf("HTTP/1.0 200 OK\r\nContent-Type:text/html;charset=utf-8\r\nContent-Length:%d\r\n\r\n%s", len(valSend), valSend)
         conn.Write([]byte(sendByte))
@@ -152,8 +180,17 @@ func parseReq(reqAry []string) string {
         return retAry[1]
 }
 
+//eg: handle
+type Handle struct {
+}
+
+func (this *Handle) Test(mapParam *map[string]string) string {
+        return fmt.Sprintf("called in test len: %d", len(*mapParam))
+}
+
 func main() {
         webobj := NewWeb()
+        webobj.AddHandles(&Handle{})
         webobj.Start(":8080")
 
         webobj.WaitSignal()
