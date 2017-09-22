@@ -13,3 +13,6 @@ request in IE:http://10.2.61.130:8080/test<br>
 the content in IE:<br>
 hello web golang reqName: /test, map length: 1<br>
 
+the request format below is well supported<br>
+http://10.2.61.130:8080/test?a=123<br>
+http://10.2.61.130:8080/test?a=123&b=4<br>
