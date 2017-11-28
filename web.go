@@ -72,6 +72,7 @@ func (this *web) Start(port string) {
                 _, err = conn.Read(buf)
                 if err != nil {
                         fmt.Println("Error to read message because of ", err)
+                        conn.Close()
                         continue
                 }
                 if ok, retAry := checkFullReq(string(buf)); ok {
